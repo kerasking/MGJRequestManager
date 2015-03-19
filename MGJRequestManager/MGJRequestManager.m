@@ -182,6 +182,7 @@ static NSString * const MGJFileProcessingQueue = @"MGJFileProcessingQueue";
     configuration.baseURL = self.baseURL;
     configuration.resultCacheDuration = self.resultCacheDuration;
     configuration.builtinParameters = [self.builtinParameters copy];
+    configuration.userInfo = self.userInfo;
     return configuration;
 }
 
@@ -191,6 +192,7 @@ static NSString * const MGJFileProcessingQueue = @"MGJFileProcessingQueue";
 @property (nonatomic) AFHTTPRequestOperationManager *requestManager;
 @property (nonatomic) NSMutableDictionary *chainedOperations;
 @property (nonatomic) NSMapTable *completionBlocks;
+@property (nonatomic) NSMapTable *operationMethodParameters;
 @property (nonatomic) MGJResponseCache *cache;
 @end
 
@@ -204,9 +206,6 @@ static NSString * const MGJFileProcessingQueue = @"MGJFileProcessingQueue";
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
         instance = [[self alloc] init];
-        instance.cache = [[MGJResponseCache alloc] init];
-        instance.chainedOperations = [[NSMutableDictionary alloc] init];
-        instance.completionBlocks = [NSMapTable mapTableWithKeyOptions:NSMapTableWeakMemory valueOptions:NSMapTableCopyIn];
         
     });
     return instance;
@@ -219,6 +218,11 @@ static NSString * const MGJFileProcessingQueue = @"MGJFileProcessingQueue";
         self.networkStatus = AFNetworkReachabilityStatusUnknown;
         [[AFNetworkReachabilityManager sharedManager] startMonitoring];
         [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(reachabilityChanged:) name:AFNetworkingReachabilityDidChangeNotification object:nil];
+        
+        self.cache = [[MGJResponseCache alloc] init];
+        self.chainedOperations = [[NSMutableDictionary alloc] init];
+        self.completionBlocks = [NSMapTable mapTableWithKeyOptions:NSMapTableWeakMemory valueOptions:NSMapTableCopyIn];
+        self.operationMethodParameters = [NSMapTable mapTableWithKeyOptions:NSMapTableWeakMemory valueOptions:NSMapTableStrongMemory];
     }
     return self;
 }
@@ -303,6 +307,34 @@ static NSString * const MGJFileProcessingQueue = @"MGJFileProcessingQueue";
         request = [self.requestManager.requestSerializer requestWithMethod:method URLString:[[NSURL URLWithString:combinedURL relativeToURL:[NSURL URLWithString:configuration.baseURL]] absoluteString] parameters:parameters error:nil];
     }
     
+    AFHTTPRequestOperation *operation = [self createOperationWithConfiguration:configuration request:request];
+    
+    if (!startImmediately) {
+        NSMutableDictionary *methodParameters = [NSMutableDictionary dictionaryWithDictionary:@{
+                                           @"method": method,
+                                           @"URLString": URLString,
+                                           @"parameters": parameters,
+                                           @"constructingBodyWithBlock": block,
+                                           @"configurationHandler": configurationHandler,
+                                           @"completionHandler": completionHandler,
+                                           }];
+        if (parameters) {
+            methodParameters[@"parameters"] = parameters;
+        }
+        if (block) {
+            methodParameters[@"constructingBodyWithBlock"] = block;
+        }
+        if (configurationHandler) {
+            methodParameters[@"configurationHandler"] = configurationHandler;
+        }
+        if (completionHandler) {
+            methodParameters[@"completionHandler"] = completionHandler;
+        }
+        
+        [self.operationMethodParameters setObject:methodParameters forKey:operation];
+        return operation;
+    }
+    
     // 如果设置为使用缓存，那么先去缓存里看一下
     if (configuration.resultCacheDuration > 0 && [method isEqualToString:@"GET"]) {
         NSString *urlKey = [URLString stringByAppendingString:[self serializeParams:parameters]];
@@ -312,15 +344,25 @@ static NSString * const MGJFileProcessingQueue = @"MGJFileProcessingQueue";
         }
     }
     
-    AFHTTPRequestOperation *operation = [self createOperationWithConfiguration:configuration request:request];
-    
     __weak typeof(self) weakSelf = self;
     
     void (^checkIfShouldDoChainOperation)(AFHTTPRequestOperation *) = ^(AFHTTPRequestOperation *operation){
         // TODO 不用每次都去找一下 ChainedOperations
         AFHTTPRequestOperation *nextOperation = [weakSelf findNextOperationInChainedOperationsBy:operation];
         if (nextOperation) {
-            [weakSelf.requestManager.operationQueue addOperation:nextOperation];
+            NSDictionary *methodParameters = [weakSelf.operationMethodParameters objectForKey:nextOperation];
+            if (methodParameters) {
+                [weakSelf HTTPRequestOperationWithMethod:methodParameters[@"method"]
+                                               URLString:methodParameters[@"URLString"]
+                                              parameters:methodParameters[@"parameters"]
+                                        startImmediately:YES
+                               constructingBodyWithBlock:methodParameters[@"constructingBodyWithBlock"]
+                                    configurationHandler:methodParameters[@"configurationHandler"]
+                                       completionHandler:methodParameters[@"completionHandler"]];
+                [weakSelf.operationMethodParameters removeObjectForKey:nextOperation];
+            } else {
+                [weakSelf.requestManager.operationQueue addOperation:nextOperation];
+            }
         }
     };
     
@@ -368,7 +410,6 @@ static NSString * const MGJFileProcessingQueue = @"MGJFileProcessingQueue";
         }
         
         completionHandler(response.error, response.result, NO, theOperation);
-        // 及时移除，避免循环引用
         [weakSelf.completionBlocks removeObjectForKey:theOperation];
         
         checkIfShouldDoChainOperation(theOperation);
@@ -400,13 +441,11 @@ static NSString * const MGJFileProcessingQueue = @"MGJFileProcessingQueue";
         handleFailure(theOperation, error);
     }];
     
-    if (startImmediately) {
-        if (!handleRequest(operation, configuration.userInfo, configuration)) {
-            [self.requestManager.operationQueue addOperation:operation];
-        } else {
-            NSError *error = [NSError errorWithDomain:@"取消请求" code:-1 userInfo:nil];
-            handleFailure(operation, error);
-        }
+    if (!handleRequest(operation, configuration.userInfo, configuration)) {
+        [self.requestManager.operationQueue addOperation:operation];
+    } else {
+        NSError *error = [NSError errorWithDomain:@"取消请求" code:-1 userInfo:nil];
+        handleFailure(operation, error);
     }
     
     [self.completionBlocks setObject:operation.completionBlock forKey:operation];
@@ -416,7 +455,19 @@ static NSString * const MGJFileProcessingQueue = @"MGJFileProcessingQueue";
 
 - (void)startOperation:(AFHTTPRequestOperation *)operation
 {
-    [self.requestManager.operationQueue addOperation:operation];
+    NSDictionary *methodParameters = [self.operationMethodParameters objectForKey:operation];
+    if (methodParameters) {
+        [self HTTPRequestOperationWithMethod:methodParameters[@"method"]
+                                       URLString:methodParameters[@"URLString"]
+                                      parameters:methodParameters[@"parameters"]
+                                startImmediately:YES
+                       constructingBodyWithBlock:methodParameters[@"constructingBodyWithBlock"]
+                            configurationHandler:methodParameters[@"configurationHandler"]
+                               completionHandler:methodParameters[@"completionHandler"]];
+        [self.operationMethodParameters removeObjectForKey:operation];
+    } else {
+        [self.requestManager.operationQueue addOperation:operation];
+    }
 }
 
 - (NSArray *)runningRequests
