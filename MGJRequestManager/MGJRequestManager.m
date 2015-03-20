@@ -194,6 +194,7 @@ static NSString * const MGJFileProcessingQueue = @"MGJFileProcessingQueue";
 @property (nonatomic) NSMapTable *completionBlocks;
 @property (nonatomic) NSMapTable *operationMethodParameters;
 @property (nonatomic) MGJResponseCache *cache;
+@property (nonatomic) NSMutableArray *batchGroups;
 @end
 
 @implementation MGJRequestManager
@@ -223,6 +224,7 @@ static NSString * const MGJFileProcessingQueue = @"MGJFileProcessingQueue";
         self.chainedOperations = [[NSMutableDictionary alloc] init];
         self.completionBlocks = [NSMapTable mapTableWithKeyOptions:NSMapTableWeakMemory valueOptions:NSMapTableCopyIn];
         self.operationMethodParameters = [NSMapTable mapTableWithKeyOptions:NSMapTableWeakMemory valueOptions:NSMapTableStrongMemory];
+        self.batchGroups = [[NSMutableArray alloc] init];
     }
     return self;
 }
@@ -313,10 +315,6 @@ static NSString * const MGJFileProcessingQueue = @"MGJFileProcessingQueue";
         NSMutableDictionary *methodParameters = [NSMutableDictionary dictionaryWithDictionary:@{
                                            @"method": method,
                                            @"URLString": URLString,
-                                           @"parameters": parameters,
-                                           @"constructingBodyWithBlock": block,
-                                           @"configurationHandler": configurationHandler,
-                                           @"completionHandler": completionHandler,
                                            }];
         if (parameters) {
             methodParameters[@"parameters"] = parameters;
@@ -527,10 +525,48 @@ static NSString * const MGJFileProcessingQueue = @"MGJFileProcessingQueue";
 
 - (void)batchOfRequestOperations:(NSArray *)operations
                    progressBlock:(void (^)(NSUInteger, NSUInteger))progressBlock
-                 completionBlock:(void (^)(NSArray *))completionBlock
+                 completionBlock:(void (^)())completionBlock
 {
-    NSArray *newOperations = [AFHTTPRequestOperation batchOfRequestOperations:operations progressBlock:progressBlock completionBlock:completionBlock];
-    [self.requestManager.operationQueue addOperations:newOperations waitUntilFinished:NO];
+    __block dispatch_group_t group = dispatch_group_create();
+    [self.batchGroups addObject:group];
+    __block NSInteger finishedOperationsCount = 0;
+    NSInteger totalOperationsCount = operations.count;
+    
+    [operations enumerateObjectsUsingBlock:^(AFHTTPRequestOperation *operation, NSUInteger idx, BOOL *stop) {
+        NSMutableDictionary *operationMethodParameters = [NSMutableDictionary dictionaryWithDictionary:[self.operationMethodParameters objectForKey:operation]];
+        if (operationMethodParameters) {
+            dispatch_group_enter(group);
+            MGJRequestManagerCompletionHandler originCompletionHandler = [(MGJRequestManagerCompletionHandler) operationMethodParameters[@"completionHandler"] copy];
+            
+            MGJRequestManagerCompletionHandler newCompletionHandler = ^(NSError *error, id result, BOOL isFromCache, AFHTTPRequestOperation *theOperation) {
+                if (!isFromCache) {
+                    dispatch_group_leave(group);
+                    if (progressBlock) {
+                        progressBlock(++finishedOperationsCount, totalOperationsCount);
+                    }
+                    
+                }
+                
+                dispatch_async(dispatch_get_main_queue(), ^{
+                    if (originCompletionHandler) {
+                        originCompletionHandler(error, result, isFromCache, theOperation);
+                    }
+                });
+            };
+            operationMethodParameters[@"completionHandler"] = newCompletionHandler;
+            
+            [self.operationMethodParameters setObject:operationMethodParameters forKey:operation];
+            [self startOperation:operation];
+            
+        }
+    }];
+    
+    dispatch_group_notify(group, dispatch_get_main_queue(), ^{
+        [self.batchGroups removeObject:group];
+        if (completionBlock) {
+            completionBlock();
+        }
+    });
 }
 
 - (AFHTTPRequestOperation *)reAssembleOperation:(AFHTTPRequestOperation *)operation
@@ -590,6 +626,7 @@ static NSString * const MGJFileProcessingQueue = @"MGJFileProcessingQueue";
 - (void)setConfiguration:(MGJRequestManagerConfiguration *)configuration
 {
     if (_configuration != configuration) {
+        _configuration = configuration;
         if (_configuration.resultCacheDuration > 0) {
             double pastTimeInterval = [[NSDate date] timeIntervalSince1970] - _configuration.resultCacheDuration;
             NSDate *pastDate = [NSDate dateWithTimeIntervalSince1970:pastTimeInterval];

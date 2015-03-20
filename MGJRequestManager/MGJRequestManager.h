@@ -120,7 +120,7 @@ typedef void (^MGJRequestManagerParametersHandler)(NSDictionary *requestParamete
  */
 - (void)batchOfRequestOperations:(NSArray *)operations
                         progressBlock:(void (^)(NSUInteger numberOfFinishedOperations, NSUInteger totalNumberOfOperations))progressBlock
-                      completionBlock:(void (^)(NSArray *operations))completionBlock;
+                      completionBlock:(void (^)())completionBlock;
 
 /**
  *  开始执行 Operation，这个 Operation 可以是之前设置 startImmediately 为 NO 的
