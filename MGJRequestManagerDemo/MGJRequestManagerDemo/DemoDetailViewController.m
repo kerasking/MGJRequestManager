@@ -37,17 +37,17 @@
     // Do any additional setup after loading the view.
 }
 
-//- (void)viewWillAppear:(BOOL)animated
-//{
-//    [super viewWillAppear:animated];
-//    self.resultTextView.text = @"";
-//}
-
 - (void)appendLog:(NSString *)log
 {
     NSString *currentLog = self.resultTextView.text;
     currentLog = [currentLog stringByAppendingString:[NSString stringWithFormat:@"\n----------\n%@", log]];
     self.resultTextView.text = currentLog;
+}
+
+- (void)viewDidDisappear:(BOOL)animated
+{
+    [super viewDidDisappear:animated];
+    self.resultTextView.text = @"";
 }
 
 - (UITextView *)resultTextView
