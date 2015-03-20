@@ -12,6 +12,7 @@
 
 @interface DemoDetailViewController ()
 @property (nonatomic) UITextView *resultTextView;
+@property (nonatomic) SEL selectedSelector;
 @end
 
 @implementation DemoDetailViewController
@@ -20,12 +21,12 @@
 {
     DemoDetailViewController *detailViewController = [[DemoDetailViewController alloc] init];
     [DemoListViewController registerWithTitle:@"发送一个 GET 请求" handler:^UIViewController *{
-        [detailViewController makeGETRequest];
+        detailViewController.selectedSelector = @selector(makeGETRequest);
         return detailViewController;
     }];
     
     [DemoListViewController registerWithTitle:@"发送一个可以缓存 GET 的请求" handler:^UIViewController *{
-        [detailViewController makeCacheGETRequest];
+        detailViewController.selectedSelector = @selector(makeCacheGETRequest);
         return detailViewController;
     }];
 }
@@ -42,12 +43,21 @@
     NSString *currentLog = self.resultTextView.text;
     currentLog = [currentLog stringByAppendingString:[NSString stringWithFormat:@"\n----------\n%@", log]];
     self.resultTextView.text = currentLog;
+    [self.resultTextView sizeThatFits:CGSizeMake(self.view.frame.size.width, CGFLOAT_MAX)];
+}
+
+- (void)viewDidAppear:(BOOL)animated
+{
+    [super viewDidAppear:animated];
+    [self.resultTextView addObserver:self forKeyPath:@"contentSize" options:NSKeyValueObservingOptionNew context:nil];
+    [self performSelector:self.selectedSelector withObject:nil afterDelay:0];
 }
 
 - (void)viewDidDisappear:(BOOL)animated
 {
     [super viewDidDisappear:animated];
     self.resultTextView.text = @"";
+    [self.resultTextView removeObserver:self forKeyPath:@"contentSize"];
 }
 
 - (UITextView *)resultTextView
@@ -68,16 +78,27 @@
     return _resultTextView;
 }
 
+- (void)observeValueForKeyPath:(NSString *)keyPath ofObject:(id)object change:(NSDictionary *)change context:(void *)context
+{
+    if ([keyPath isEqualToString:@"contentSize"]) {
+        NSInteger contentHeight = self.resultTextView.contentSize.height;
+        NSInteger textViewHeight = self.resultTextView.frame.size.height;
+        [self.resultTextView setContentOffset:CGPointMake(0, MAX(contentHeight - textViewHeight, 0)) animated:YES];
+    }
+}
+
 - (void)makeGETRequest
 {
+    [self appendLog:@"准备中..."];
     [[MGJRequestManager sharedInstance] GET:@"http://httpbin.org/get" parameters:@{@"foo": @"bar"} startImmediately:YES
  configurationHandler:nil completionHandler:^(NSError *error, id<NSObject> result, BOOL isFromCache, AFHTTPRequestOperation *operation) {
-     self.resultTextView.text = result.description;
+     [self appendLog:result.description];
  }];
 }
 
 - (void)makeCacheGETRequest
 {
+    [self appendLog:@"准备中..."];
     AFHTTPRequestOperation *operation1 = [[MGJRequestManager sharedInstance]
                                           GET:@"http://httpbin.org/get"
                                           parameters:@{@"foo": @"bar"}
