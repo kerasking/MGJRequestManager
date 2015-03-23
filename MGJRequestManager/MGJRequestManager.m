@@ -371,16 +371,20 @@ NSInteger const MGJResponseCancelError = -1;
     };
     
     // 对拿到的 response 再做一层处理
-    void (^handleResponse)(AFHTTPRequestOperation *, MGJResponse *, MGJRequestManagerConfiguration *) =  ^ void(AFHTTPRequestOperation *operation, MGJResponse *response, MGJRequestManagerConfiguration *configuration) {
+    BOOL (^handleResponse)(AFHTTPRequestOperation *, MGJResponse *, MGJRequestManagerConfiguration *) =  ^ BOOL(AFHTTPRequestOperation *operation, MGJResponse *response, MGJRequestManagerConfiguration *configuration) {
+        
+        BOOL shouldStopProcessing = NO;
+        
         // 先调用默认的处理
         if (weakSelf.configuration.responseHandler) {
-            weakSelf.configuration.responseHandler(operation, response);
+            weakSelf.configuration.responseHandler(operation, response, &shouldStopProcessing);
         }
         
         // 如果客户端有定义过 responseHandler
         if (configuration.responseHandler) {
-            configuration.responseHandler(operation, response);
+            configuration.responseHandler(operation, response, &shouldStopProcessing);
         }
+        return shouldStopProcessing;
     };
     
     // 对 request 再做一层处理
@@ -404,7 +408,12 @@ NSInteger const MGJResponseCancelError = -1;
         MGJResponse *response = [[MGJResponse alloc] init];
         response.error = error;
         response.result = nil;
-        handleResponse(theOperation, response, configuration);
+        BOOL shouldStopProcessing = handleResponse(theOperation, response, configuration);
+        
+        if (shouldStopProcessing) {
+            [weakSelf.completionBlocks removeObjectForKey:theOperation];
+            return ;
+        }
         
         completionHandler(response.error, response.result, NO, theOperation);
         [weakSelf.completionBlocks removeObjectForKey:theOperation];
@@ -417,7 +426,13 @@ NSInteger const MGJResponseCancelError = -1;
         MGJResponse *response = [[MGJResponse alloc] init];
         response.error = nil;
         response.result = responseObject;
-        handleResponse(theOperation, response, configuration);
+        
+        BOOL shouldStopProcessing = handleResponse(theOperation, response, configuration);
+        
+        if (shouldStopProcessing) {
+            [weakSelf.completionBlocks removeObjectForKey:theOperation];
+            return ;
+        }
         
         // 如果使用缓存，就把结果放到缓存中方便下次使用
         if (configuration.resultCacheDuration > 0 && [method isEqualToString:@"GET"] && !response.error) {
@@ -549,17 +564,16 @@ NSInteger const MGJResponseCancelError = -1;
             
             MGJRequestManagerCompletionHandler newCompletionHandler = ^(NSError *error, id result, BOOL isFromCache, AFHTTPRequestOperation *theOperation) {
                 if (!isFromCache) {
-                    dispatch_group_leave(group);
                     if (progressBlock) {
                         progressBlock(++finishedOperationsCount, totalOperationsCount);
                     }
-                    
                 }
                 
                 dispatch_async(dispatch_get_main_queue(), ^{
                     if (originCompletionHandler) {
                         originCompletionHandler(error, result, isFromCache, theOperation);
                     }
+                    dispatch_group_leave(group);
                 });
             };
             operationMethodParameters[@"completionHandler"] = newCompletionHandler;
