@@ -40,6 +40,11 @@
         detailViewController.selectedSelector = @selector(calculateTokenEveryRequest);
         return detailViewController;
     }];
+    
+    [DemoListViewController registerWithTitle:@"在某些情况下可以不发送请求" handler:^UIViewController *{
+        detailViewController.selectedSelector = @selector(preventFromSendingRequest);
+        return detailViewController;
+    }];
 }
 
 - (void)viewDidLoad {
@@ -194,6 +199,24 @@
                        configurationHandler:nil
                           completionHandler:^(NSError *error, id<NSObject> result, BOOL isFromCache, AFHTTPRequestOperation *operation) {
                               [self appendLog:result.description];
+                          }];
+}
+
+- (void)preventFromSendingRequest
+{
+    MGJRequestManagerConfiguration *configuration = [[MGJRequestManagerConfiguration alloc] init];
+    configuration.requestHandler = ^(AFHTTPRequestOperation *operation, id userInfo, BOOL *shouldStopProcessing){
+        // NSString *requestURL = operation.request.URL.absoluteString;
+        // suppose requestURL contains some invalid characters
+        *shouldStopProcessing = YES;
+    };
+    
+    [MGJRequestManager sharedInstance].configuration = configuration;
+    [[MGJRequestManager sharedInstance] GET:@"http://httpbin.org/get"
+                                 parameters:nil startImmediately:YES
+                       configurationHandler:nil
+                          completionHandler:^(NSError *error, id result, BOOL isFromCache, AFHTTPRequestOperation *operation) {
+                              [self appendLog:error.description];
                           }];
 }
 
