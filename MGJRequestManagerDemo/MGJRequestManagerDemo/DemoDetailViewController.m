@@ -60,6 +60,16 @@
         detailViewController.selectedSelector = @selector(chainRequests);
         return detailViewController;
     }];
+    
+    [DemoListViewController registerWithTitle:@"获取正在发送的请求并取消" handler:^UIViewController *{
+        detailViewController.selectedSelector = @selector(runningRequests);
+        return detailViewController;
+    }];
+    
+    [DemoListViewController registerWithTitle:@"取消某个 URL 的请求" handler:^UIViewController *{
+        detailViewController.selectedSelector = @selector(cancelRequestByURL);
+        return detailViewController;
+    }];
 }
 
 - (void)viewDidLoad {
@@ -295,6 +305,42 @@
                                                                }];
     [[MGJRequestManager sharedInstance] addOperation:operation1 toChain:@"chain"];
     [[MGJRequestManager sharedInstance] addOperation:operation2 toChain:@"chain"];
+}
+
+- (void)runningRequests
+{
+    [[MGJRequestManager sharedInstance] GET:@"http://httpbin.org/delay/3"
+                                 parameters:@{@"method": @1}
+                           startImmediately:YES
+                       configurationHandler:nil
+                          completionHandler:^(NSError *error, id<NSObject> result, BOOL isFromCache, AFHTTPRequestOperation *operation) {
+                              [self appendLog:error.description];
+                          }];
+    
+    [[MGJRequestManager sharedInstance] GET:@"http://httpbin.org/get"
+                                 parameters:@{@"method": @2}
+                           startImmediately:YES
+                       configurationHandler:nil
+                          completionHandler:^(NSError *error, id<NSObject> result, BOOL isFromCache, AFHTTPRequestOperation *operation) {
+                              [self appendLog:error.description];
+                          }];
+    
+    [self appendLog:[[MGJRequestManager sharedInstance] runningRequests].description];
+    [[MGJRequestManager sharedInstance] cancelAllRequest];
+}
+
+- (void)cancelRequestByURL
+{
+    NSString *urlString = @"http://httpbin.org/delay/5";
+    [[MGJRequestManager sharedInstance] GET:urlString
+                                 parameters:@{@"method": @1}
+                           startImmediately:YES
+                       configurationHandler:nil
+                          completionHandler:^(NSError *error, id<NSObject> result, BOOL isFromCache, AFHTTPRequestOperation *operation) {
+                              [self appendLog:error.description];
+                          }];
+    
+    [[MGJRequestManager sharedInstance] cancelHTTPOperationsWithMethod:@"GET" url:urlString];
 }
 
 @end
