@@ -45,6 +45,16 @@
         detailViewController.selectedSelector = @selector(preventFromSendingRequest);
         return detailViewController;
     }];
+    
+    [DemoListViewController registerWithTitle:@"对请求结果做预处理" handler:^UIViewController *{
+        detailViewController.selectedSelector = @selector(handleResponse);
+        return detailViewController;
+    }];
+    
+    [DemoListViewController registerWithTitle:@"对特殊请求做特殊处理" handler:^UIViewController *{
+        detailViewController.selectedSelector = @selector(handleSpecialRequest);
+        return detailViewController;
+    }];
 }
 
 - (void)viewDidLoad {
@@ -217,6 +227,47 @@
                        configurationHandler:nil
                           completionHandler:^(NSError *error, id result, BOOL isFromCache, AFHTTPRequestOperation *operation) {
                               [self appendLog:error.description];
+                          }];
+}
+
+- (void)handleResponse
+{
+    MGJRequestManagerConfiguration *configuration = [[MGJRequestManagerConfiguration alloc] init];
+    configuration.responseHandler = ^(AFHTTPRequestOperation *operation, MGJResponse *response) {
+        // response.result 里包含了原始的 object
+        // 如果服务端返回的 result 中包含了 error 信息，可以设置 response.error
+        // 这样使用方就可以知道这个请求失败了
+        NSDictionary *args = response.result[@"args"];
+        if ([args[@"status"] isEqualToString:@"error"]) {
+            response.error = [NSError errorWithDomain:args[@"message"] code:403 userInfo:nil];
+            response.result = nil;
+        }
+    };
+    
+    [MGJRequestManager sharedInstance].configuration = configuration;
+    [[MGJRequestManager sharedInstance] GET:@"http://httpbin.org/get" parameters:@{@"status": @"error", @"message": @"模拟请求失败"} startImmediately:YES configurationHandler:nil completionHandler:^(NSError *error, id result, BOOL isFromCache, AFHTTPRequestOperation *operation) {
+        if (error) {
+            [self appendLog:error.description];
+        }
+    }];
+}
+
+- (void)handleSpecialRequest
+{
+    [[MGJRequestManager sharedInstance] GET:@"http://httpbin.org/get"
+                                 parameters:nil
+                           startImmediately:YES
+                       configurationHandler:^(MGJRequestManagerConfiguration *configuration) {
+                           configuration.requestHandler = ^(AFHTTPRequestOperation *operation, id userInfo, BOOL *shouldStopProcessing) {
+                               // 假设这是一个特殊请求
+                               *shouldStopProcessing = YES;
+                           };
+                           [self appendLog:@"这个请求不会被发出去，被特殊处理了"];
+                       }
+                          completionHandler:^(NSError *error, id result, BOOL isFromCache, AFHTTPRequestOperation *operation) {
+                              if (error.code == MGJResponseCancelError) {
+                                  [self appendLog:@"这个请求被取消了"];
+                              }
                           }];
 }
 

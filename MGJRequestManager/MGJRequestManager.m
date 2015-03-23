@@ -11,6 +11,8 @@
 static NSString * const MGJRequestManagerCacheDirectory = @"requestCacheDirectory";
 static NSString * const MGJFileProcessingQueue = @"MGJFileProcessingQueue";
 
+NSInteger const MGJResponseCancelError = -1;
+
 @interface MGJResponseCache : NSObject
 
 - (void)setObject:(id <NSCoding>)object forKey:(NSString *)key;
@@ -435,7 +437,7 @@ static NSString * const MGJFileProcessingQueue = @"MGJFileProcessingQueue";
     if (!handleRequest(operation, configuration.userInfo, configuration)) {
         [self.requestManager.operationQueue addOperation:operation];
     } else {
-        NSError *error = [NSError errorWithDomain:@"取消请求" code:-1 userInfo:nil];
+        NSError *error = [NSError errorWithDomain:@"取消请求" code:MGJResponseCancelError userInfo:nil];
         handleFailure(operation, error);
     }
     

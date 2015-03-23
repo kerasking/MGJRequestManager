@@ -9,6 +9,8 @@
 #import <Foundation/Foundation.h>
 #import <AFNetworking.h>
 
+extern NSInteger const MGJResponseCancelError;
+
 @interface MGJResponse : NSObject
 @property (nonatomic) NSError *error;
 @property (nonatomic) id result;
