@@ -80,6 +80,11 @@
         detailViewController.selectedSelector = @selector(simulateTokenExpired);
         return detailViewController;
     }];
+    
+    [DemoListViewController registerWithTitle:@"发送请求时显示 Loading" handler:^UIViewController *{
+        detailViewController.selectedSelector = @selector(showLoadingWhenSendingRequest);
+        return detailViewController;
+    }];
 }
 
 - (void)viewDidLoad {
@@ -286,7 +291,7 @@
 - (void)handleResponse
 {
     MGJRequestManagerConfiguration *configuration = [[MGJRequestManagerConfiguration alloc] init];
-    configuration.responseHandler = ^(AFHTTPRequestOperation *operation, MGJResponse *response, BOOL *shouldStopProcessing) {
+    configuration.responseHandler = ^(AFHTTPRequestOperation *operation, id userInfo, MGJResponse *response, BOOL *shouldStopProcessing) {
         // response.result 里包含了原始的 object
         // 如果服务端返回的 result 中包含了 error 信息，可以设置 response.error
         // 这样使用方就可以知道这个请求失败了
@@ -384,7 +389,7 @@
 - (void)simulateTokenExpired
 {
     MGJRequestManagerConfiguration *configuration = [[MGJRequestManagerConfiguration alloc] init];
-    configuration.responseHandler = ^(AFHTTPRequestOperation *operation, MGJResponse *response, BOOL *shouldStopProcessing) {
+    configuration.responseHandler = ^(AFHTTPRequestOperation *operation, id userInfo, MGJResponse *response, BOOL *shouldStopProcessing) {
         static BOOL hasExecuted;
         if (!hasExecuted) {
             hasExecuted = YES;
@@ -411,6 +416,32 @@
     [MGJRequestManager sharedInstance].configuration = configuration;
     
     [[MGJRequestManager sharedInstance] GET:@"http://httpbin.org/delay/2" parameters:nil startImmediately:YES configurationHandler:nil completionHandler:^(NSError *error, id<NSObject> result, BOOL isFromCache, AFHTTPRequestOperation *operation) {
+        [self appendLog:result.description];
+    }];
+}
+
+- (void)showLoadingWhenSendingRequest
+{
+    MGJRequestManagerConfiguration *configuration = [[MGJRequestManagerConfiguration alloc] init];
+    UIActivityIndicatorView *indicatorView = [[UIActivityIndicatorView alloc] initWithActivityIndicatorStyle:UIActivityIndicatorViewStyleGray];
+    indicatorView.frame = CGRectMake(self.view.frame.size.width / 2 - 8, self.view.frame.size.height / 2 - 8, 16, 16);
+    [self.view addSubview:indicatorView];
+    configuration.requestHandler = ^(AFHTTPRequestOperation *operation, id userInfo, BOOL *shouldStopProcessing) {
+        if (userInfo[@"showLoading"]) {
+            [indicatorView startAnimating];
+        }
+    };
+    
+    configuration.responseHandler = ^(AFHTTPRequestOperation *operation, id userInfo, MGJResponse *response, BOOL *shouldStopProcessing) {
+        if (userInfo[@"showLoading"]) {
+            [indicatorView stopAnimating];
+        }
+    };
+    
+    [MGJRequestManager sharedInstance].configuration = configuration;
+    [[MGJRequestManager sharedInstance] GET:@"http://httpbin.org/delay/2" parameters:nil startImmediately:YES configurationHandler:^(MGJRequestManagerConfiguration *configuration){
+        configuration.userInfo = @{@"showLoading": @YES};
+    } completionHandler:^(NSError *error, id<NSObject> result, BOOL isFromCache, AFHTTPRequestOperation *operation) {
         [self appendLog:result.description];
     }];
 }
