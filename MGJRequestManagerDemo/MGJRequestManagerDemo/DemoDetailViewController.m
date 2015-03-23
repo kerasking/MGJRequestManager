@@ -502,9 +502,9 @@
 - (void)uploadImage
 {
     UIImage *image = [UIImage imageNamed:@"warren.jpg"];
-    NSInteger positionX = self.resultTextView.frame.size.width / 2 - 100;
-    NSInteger positionY = self.resultTextView.frame.size.height / 2 - 100;
-    UIImageView *imageView = [[UIImageView alloc] initWithFrame:CGRectMake(positionX, positionY, 200, 200)];
+    NSInteger positionX = self.resultTextView.frame.size.width / 2 - 121;
+    NSInteger positionY = self.resultTextView.frame.size.height / 2 - 80;
+    UIImageView *imageView = [[UIImageView alloc] initWithFrame:CGRectMake(positionX, positionY, 242, 160)];
     [self.resultTextView addSubview:imageView];
     
     // 为了这个 Demo 特地去申请一个 APIKey···
