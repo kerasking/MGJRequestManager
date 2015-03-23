@@ -85,6 +85,11 @@
         detailViewController.selectedSelector = @selector(showLoadingWhenSendingRequest);
         return detailViewController;
     }];
+    
+    [DemoListViewController registerWithTitle:@"统计请求花费的时间" handler:^UIViewController *{
+        detailViewController.selectedSelector = @selector(calculateRequestTime);
+        return detailViewController;
+    }];
 }
 
 - (void)viewDidLoad {
@@ -110,7 +115,7 @@
 {
     [super viewDidAppear:animated];
     [MGJRequestManager sharedInstance].configuration = nil;
-    [self appendLog:@"准备中..."];
+    [self appendLog:@"正在发送请求..."];
     [self.resultTextView addObserver:self forKeyPath:@"contentSize" options:NSKeyValueObservingOptionNew context:nil];
     [self performSelector:self.selectedSelector withObject:nil afterDelay:0];
 }
@@ -441,6 +446,23 @@
     [MGJRequestManager sharedInstance].configuration = configuration;
     [[MGJRequestManager sharedInstance] GET:@"http://httpbin.org/delay/2" parameters:nil startImmediately:YES configurationHandler:^(MGJRequestManagerConfiguration *configuration){
         configuration.userInfo = @{@"showLoading": @YES};
+    } completionHandler:^(NSError *error, id<NSObject> result, BOOL isFromCache, AFHTTPRequestOperation *operation) {
+        [self appendLog:result.description];
+    }];
+}
+
+- (void)calculateRequestTime
+{
+    MGJRequestManagerConfiguration *configuration = [[MGJRequestManagerConfiguration alloc] init];
+    NSTimeInterval startTime = [[NSDate date] timeIntervalSince1970];
+    
+    configuration.responseHandler = ^(AFHTTPRequestOperation *operation, id userInfo, MGJResponse *response, BOOL *shouldStopProcessing) {
+        [self appendLog:[NSString stringWithFormat:@"此次请求花费了:%f 秒", [[NSDate date] timeIntervalSince1970] - startTime]];
+    };
+    
+    [MGJRequestManager sharedInstance].configuration = configuration;
+    [[MGJRequestManager sharedInstance] GET:@"http://httpbin.org/delay/2" parameters:nil startImmediately:YES configurationHandler:^(MGJRequestManagerConfiguration *configuration){
+        // 这里还可以再加一些自定义的 userInfo
     } completionHandler:^(NSError *error, id<NSObject> result, BOOL isFromCache, AFHTTPRequestOperation *operation) {
         [self appendLog:result.description];
     }];

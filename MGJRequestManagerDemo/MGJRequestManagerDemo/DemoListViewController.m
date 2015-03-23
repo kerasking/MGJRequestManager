@@ -61,7 +61,7 @@ static NSMutableArray *titles;
 - (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath
 {
     [tableView deselectRowAtIndexPath:indexPath animated:YES];
-    UIViewController *viewController = ((ViewControllerHandler)titleWithHandlers.allValues[indexPath.row])();
+    UIViewController *viewController = ((ViewControllerHandler)titleWithHandlers[titles[indexPath.row]])();
     [self.navigationController pushViewController:viewController animated:YES];
 }
 
