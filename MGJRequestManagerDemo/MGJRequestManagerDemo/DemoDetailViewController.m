@@ -26,6 +26,11 @@
         return detailViewController;
     }];
     
+    [DemoListViewController registerWithTitle:@"发送一个 POST 请求" handler:^UIViewController *{
+        detailViewController.selectedSelector = @selector(makePOSTRequest);
+        return detailViewController;
+    }];
+    
     [DemoListViewController registerWithTitle:@"发送一个可以缓存 GET 的请求" handler:^UIViewController *{
         detailViewController.selectedSelector = @selector(makeCacheGETRequest);
         return detailViewController;
@@ -171,6 +176,14 @@
 - (void)makeGETRequest
 {
     [[MGJRequestManager sharedInstance] GET:@"http://httpbin.org/get" parameters:@{@"foo": @"bar"} startImmediately:YES
+ configurationHandler:nil completionHandler:^(NSError *error, id<NSObject> result, BOOL isFromCache, AFHTTPRequestOperation *operation) {
+     [self appendLog:result.description];
+ }];
+}
+
+- (void)makePOSTRequest
+{
+    [[MGJRequestManager sharedInstance] POST:@"http://httpbin.org/post" parameters:@{@"foo": @"bar"} startImmediately:YES
  configurationHandler:nil completionHandler:^(NSError *error, id<NSObject> result, BOOL isFromCache, AFHTTPRequestOperation *operation) {
      [self appendLog:result.description];
  }];
