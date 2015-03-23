@@ -55,6 +55,11 @@
         detailViewController.selectedSelector = @selector(handleSpecialRequest);
         return detailViewController;
     }];
+    
+    [DemoListViewController registerWithTitle:@"串行发送多个请求" handler:^UIViewController *{
+        detailViewController.selectedSelector = @selector(chainRequests);
+        return detailViewController;
+    }];
 }
 
 - (void)viewDidLoad {
@@ -269,6 +274,27 @@
                                   [self appendLog:@"这个请求被取消了"];
                               }
                           }];
+}
+
+- (void)chainRequests
+{
+    AFHTTPRequestOperation *operation1 = [[MGJRequestManager sharedInstance] GET:@"http://httpbin.org/delay/3"
+                                                                      parameters:@{@"method": @1}
+                                                                startImmediately:NO
+                                                            configurationHandler:nil
+                                                               completionHandler:^(NSError *error, id<NSObject> result, BOOL isFromCache, AFHTTPRequestOperation *operation) {
+                                                                   [self appendLog:result.description];
+                                                               }];
+    
+    AFHTTPRequestOperation *operation2 = [[MGJRequestManager sharedInstance] GET:@"http://httpbin.org/get"
+                                                                      parameters:@{@"method": @2}
+                                                                startImmediately:NO
+                                                            configurationHandler:nil
+                                                               completionHandler:^(NSError *error, id<NSObject> result, BOOL isFromCache, AFHTTPRequestOperation *operation) {
+                                                                   [self appendLog:result.description];
+                                                               }];
+    [[MGJRequestManager sharedInstance] addOperation:operation1 toChain:@"chain"];
+    [[MGJRequestManager sharedInstance] addOperation:operation2 toChain:@"chain"];
 }
 
 @end
