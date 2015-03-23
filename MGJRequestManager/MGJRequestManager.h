@@ -113,6 +113,13 @@ typedef void (^MGJRequestManagerParametersHandler)(NSMutableDictionary *requestP
 - (void)removeOperation:(AFHTTPRequestOperation *)operation inChain:(NSString *)chain;
 
 /**
+ *  移除某个 Chain 里的所有 Operations
+ *
+ *  @param chain
+ */
+- (void)removeOperationsInChain:(NSString *)chain;
+
+/**
  *  并行执行一些列Operation
  *
  *  @param operations      待执行的operations
@@ -128,7 +135,7 @@ typedef void (^MGJRequestManagerParametersHandler)(NSMutableDictionary *requestP
  *
  *  @param operation 
  */
-- (void)startOperation:(AFHTTPRequestOperation *)operation;
+- (AFHTTPRequestOperation *)startOperation:(AFHTTPRequestOperation *)operation;
 
 /**
  *  取消所有正在发送的请求

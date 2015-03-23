@@ -446,21 +446,23 @@ NSInteger const MGJResponseCancelError = -1;
     return operation;
 }
 
-- (void)startOperation:(AFHTTPRequestOperation *)operation
+- (AFHTTPRequestOperation *)startOperation:(AFHTTPRequestOperation *)operation
 {
     NSDictionary *methodParameters = [self.operationMethodParameters objectForKey:operation];
+    AFHTTPRequestOperation *newOperation = operation;
     if (methodParameters) {
-        [self HTTPRequestOperationWithMethod:methodParameters[@"method"]
-                                       URLString:methodParameters[@"URLString"]
-                                      parameters:methodParameters[@"parameters"]
-                                startImmediately:YES
-                       constructingBodyWithBlock:methodParameters[@"constructingBodyWithBlock"]
-                            configurationHandler:methodParameters[@"configurationHandler"]
-                               completionHandler:methodParameters[@"completionHandler"]];
+        newOperation = [self HTTPRequestOperationWithMethod:methodParameters[@"method"]
+                                                                          URLString:methodParameters[@"URLString"]
+                                                                         parameters:methodParameters[@"parameters"]
+                                                                   startImmediately:YES
+                                                          constructingBodyWithBlock:methodParameters[@"constructingBodyWithBlock"]
+                                                               configurationHandler:methodParameters[@"configurationHandler"]
+                                                                  completionHandler:methodParameters[@"completionHandler"]];
         [self.operationMethodParameters removeObjectForKey:operation];
     } else {
         [self.requestManager.operationQueue addOperation:operation];
     }
+    return newOperation;
 }
 
 - (NSArray *)runningRequests
@@ -498,10 +500,13 @@ NSInteger const MGJResponseCancelError = -1;
     if (!self.chainedOperations[chainName]) {
         self.chainedOperations[chainName] = [[NSMutableArray alloc] init];
     }
-    [self.chainedOperations[chainName] addObject:operation];
-    if (((NSMutableArray *)self.chainedOperations[chainName]).count == 1) {
-        [self.requestManager.operationQueue addOperation:operation];
+    
+    // 只加入第一个，其余的在第一个执行完后会依次执行
+    if (!((NSMutableArray *)self.chainedOperations[chainName]).count) {
+        operation = [self startOperation:operation];
     }
+    
+    [self.chainedOperations[chainName] addObject:operation];
 }
 
 - (NSArray *)operationsInChain:(NSString *)chain
@@ -515,6 +520,15 @@ NSInteger const MGJResponseCancelError = -1;
     if (self.chainedOperations[chainName]) {
         NSMutableArray *chainedOperations = self.chainedOperations[chainName];
         [chainedOperations removeObject:operation];
+    }
+}
+
+- (void)removeOperationsInChain:(NSString *)chain
+{
+    NSString *chainName = chain ? : @"";
+    if (self.chainedOperations[chainName]) {
+        NSMutableArray *chainedOperations = self.chainedOperations[chainName];
+        [chainedOperations removeAllObjects];
     }
 }
 
@@ -575,9 +589,13 @@ NSInteger const MGJResponseCancelError = -1;
 
 #pragma mark - Utils
 
+/**
+ *  从 Chained Operations 中找到该 Operation 对应的下一个 Operation
+ *  注意：会从 Chain 中移除该 Operation!
+ */
 - (AFHTTPRequestOperation *)findNextOperationInChainedOperationsBy:(AFHTTPRequestOperation *)operation
 {
-    // 这个实现有优化的空间
+    //TODO 这个实现有优化空间
     __block AFHTTPRequestOperation *theOperation;
     __weak typeof(self) weakSelf = self;
     
@@ -589,6 +607,8 @@ NSInteger const MGJResponseCancelError = -1;
                     *stop = YES;
                 }
                 [chainedOperations removeObject:requestOperation];
+                // 同时移除对要返回的 operation 的引用
+                [chainedOperations removeObject:theOperation];
             }
         }];
         if (chainedOperations) {
