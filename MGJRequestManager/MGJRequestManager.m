@@ -377,12 +377,12 @@ NSInteger const MGJResponseCancelError = -1;
         
         // 先调用默认的处理
         if (weakSelf.configuration.responseHandler) {
-            weakSelf.configuration.responseHandler(operation, response, &shouldStopProcessing);
+            weakSelf.configuration.responseHandler(operation, configuration.userInfo, response, &shouldStopProcessing);
         }
         
         // 如果客户端有定义过 responseHandler
         if (configuration.responseHandler) {
-            configuration.responseHandler(operation, response, &shouldStopProcessing);
+            configuration.responseHandler(operation, configuration.userInfo, response, &shouldStopProcessing);
         }
         return shouldStopProcessing;
     };
