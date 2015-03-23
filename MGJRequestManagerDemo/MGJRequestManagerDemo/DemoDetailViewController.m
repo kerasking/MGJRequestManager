@@ -29,6 +29,11 @@
         detailViewController.selectedSelector = @selector(makeCacheGETRequest);
         return detailViewController;
     }];
+    
+    [DemoListViewController registerWithTitle:@"设置每次请求都会带上的参数" handler:^UIViewController *{
+        detailViewController.selectedSelector = @selector(makeBuiltinParametersRequest);
+        return detailViewController;
+    }];
 }
 
 - (void)viewDidLoad {
@@ -129,6 +134,27 @@
     } completionBlock:^() {
         [self appendLog:@"请求发送完成"];
     }];
+}
+
+- (void)makeBuiltinParametersRequest
+{
+    [self appendLog:@"准备中..."];
+    NSDictionary *builtinParameters = @{@"t": @([[NSDate date] timeIntervalSince1970]), @"network": @"1", @"device": @"iphone3,2"};
+    
+    MGJRequestManagerConfiguration *configuration = [[MGJRequestManagerConfiguration alloc] init];
+    configuration.builtinParameters = builtinParameters;
+    [MGJRequestManager sharedInstance].configuration = configuration;
+    
+    [[MGJRequestManager sharedInstance] GET:@"http://httpbin.org/get"
+                                 parameters:nil startImmediately:YES
+                       configurationHandler:nil
+                          completionHandler:^(NSError *error, id<NSObject> result, BOOL isFromCache, AFHTTPRequestOperation *operation) {
+                              if (error) {
+                                  [self appendLog:error.description];
+                              } else {
+                                  [self appendLog:[NSString stringWithFormat:@"请求结果: %@", result.description]];
+                              }
+                          }];
 }
 
 @end

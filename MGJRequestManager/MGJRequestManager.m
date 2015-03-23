@@ -648,36 +648,14 @@ static NSString * const MGJFileProcessingQueue = @"MGJFileProcessingQueue";
 }
 
 -(NSString *)serializeParams:(NSDictionary *)params {
-    NSMutableArray* pairs = [NSMutableArray array];
-    for (NSString* key in [params keyEnumerator]) {
-        id value = [params objectForKey:key];
-        if ([value isKindOfClass:[NSDictionary class]]) {
-            for (NSString *subKey in value) {
-                NSString* escapedValue = (NSString *)CFBridgingRelease(CFURLCreateStringByAddingPercentEscapes(NULL,
-                                                                                              (CFStringRef)[value objectForKey:subKey],
-                                                                                              NULL,
-                                                                                              (CFStringRef)@"!*'();:@&=+$,/?%#[]",
-                                                                                              kCFStringEncodingUTF8));
-                [pairs addObject:[NSString stringWithFormat:@"%@[%@]=%@", key, subKey, escapedValue]];
-            }
-        } else if ([value isKindOfClass:[NSArray class]]) {
-            for (NSString *subValue in value) {
-                NSString* escapedValue = (NSString *)CFBridgingRelease(CFURLCreateStringByAddingPercentEscapes(NULL,
-                                                                                              (CFStringRef)subValue,
-                                                                                              NULL,
-                                                                                              (CFStringRef)@"!*'();:@&=+$,/?%#[]",
-                                                                                              kCFStringEncodingUTF8));
-                [pairs addObject:[NSString stringWithFormat:@"%@[]=%@", key, escapedValue]];
-            }
-        } else {
-            NSString* escapedValue = (NSString *)CFBridgingRelease(CFURLCreateStringByAddingPercentEscapes(NULL,
-                                                                                          (CFStringRef)[params objectForKey:key],
-                                                                                          NULL,
-                                                                                          (CFStringRef)@"!*'();:@&=+$,/?%#[]",
-                                                                                          kCFStringEncodingUTF8));
-            [pairs addObject:[NSString stringWithFormat:@"%@=%@", key, escapedValue]];
-        }
-    }
-    return [pairs componentsJoinedByString:@"&"];
+    NSMutableArray *parts = [NSMutableArray array];
+    [params enumerateKeysAndObjectsUsingBlock:^(id key, id<NSObject> obj, BOOL *stop) {
+        NSString *encodedKey = [key stringByAddingPercentEscapesUsingEncoding: NSUTF8StringEncoding];
+        NSString *encodedValue = [obj.description stringByAddingPercentEscapesUsingEncoding: NSUTF8StringEncoding];
+        NSString *part = [NSString stringWithFormat: @"%@=%@", encodedKey, encodedValue];
+        [parts addObject: part];
+    }];
+    NSString *queryString = [parts componentsJoinedByString: @"&"];
+    return queryString ? [NSString stringWithFormat:@"?%@", queryString] : @"";
 }
 @end
