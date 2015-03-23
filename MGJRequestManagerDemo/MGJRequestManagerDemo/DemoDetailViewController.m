@@ -10,6 +10,7 @@
 #import "DemoListViewController.h"
 #import "MGJRequestManager.h"
 #import <CommonCrypto/CommonDigest.h>
+#import <UIImageView+AFNetworking.h>
 
 @interface DemoDetailViewController ()
 @property (nonatomic) UITextView *resultTextView;
@@ -71,6 +72,11 @@
         return detailViewController;
     }];
     
+    [DemoListViewController registerWithTitle:@"上传图片" handler:^UIViewController *{
+        detailViewController.selectedSelector = @selector(uploadImage);
+        return detailViewController;
+    }];
+    
     [DemoListViewController registerWithTitle:@"获取正在发送的请求并取消" handler:^UIViewController *{
         detailViewController.selectedSelector = @selector(runningRequests);
         return detailViewController;
@@ -116,6 +122,17 @@
     [self.resultTextView sizeThatFits:CGSizeMake(self.view.frame.size.width, CGFLOAT_MAX)];
 }
 
+- (void)viewWillAppear:(BOOL)animated
+{
+    [super viewWillAppear:animated];
+    [self.resultTextView.subviews enumerateObjectsUsingBlock:^(UIImageView *obj, NSUInteger idx, BOOL *stop) {
+        if ([obj isKindOfClass:[UIImageView class]]) {
+            // 这个是为了去除显示图片时，添加的 imageView
+            [obj removeFromSuperview];
+        }
+    }];
+}
+
 - (void)viewDidAppear:(BOOL)animated
 {
     [super viewDidAppear:animated];
@@ -128,8 +145,8 @@
 - (void)viewDidDisappear:(BOOL)animated
 {
     [super viewDidDisappear:animated];
-    self.resultTextView.text = @"";
     [self.resultTextView removeObserver:self forKeyPath:@"contentSize"];
+    self.resultTextView.text = @"";
 }
 
 - (UITextView *)resultTextView
@@ -444,6 +461,7 @@
     UIActivityIndicatorView *indicatorView = [[UIActivityIndicatorView alloc] initWithActivityIndicatorStyle:UIActivityIndicatorViewStyleGray];
     indicatorView.frame = CGRectMake(self.view.frame.size.width / 2 - 8, self.view.frame.size.height / 2 - 8, 16, 16);
     [self.view addSubview:indicatorView];
+    
     configuration.requestHandler = ^(AFHTTPRequestOperation *operation, id userInfo, BOOL *shouldStopProcessing) {
         if (userInfo[@"showLoading"]) {
             [indicatorView startAnimating];
@@ -478,6 +496,32 @@
         // 这里还可以再加一些自定义的 userInfo
     } completionHandler:^(NSError *error, id<NSObject> result, BOOL isFromCache, AFHTTPRequestOperation *operation) {
         [self appendLog:result.description];
+    }];
+}
+
+- (void)uploadImage
+{
+    UIImage *image = [UIImage imageNamed:@"warren.jpg"];
+    NSInteger positionX = self.resultTextView.frame.size.width / 2 - 100;
+    NSInteger positionY = self.resultTextView.frame.size.height / 2 - 100;
+    UIImageView *imageView = [[UIImageView alloc] initWithFrame:CGRectMake(positionX, positionY, 200, 200)];
+    [self.resultTextView addSubview:imageView];
+    
+    // 为了这个 Demo 特地去申请一个 APIKey···
+    NSDictionary *parameters = @{
+                                 @"key": @"03CFKLSU25b1dddc62545683bad52f8796bb110c",
+                                 @"format": @"json",
+                                 };
+    
+    [[MGJRequestManager sharedInstance] POST:@"https://post.imageshack.us/upload_api.php" parameters:parameters startImmediately:YES constructingBodyWithBlock:^(id<AFMultipartFormData> formData) {
+        [formData appendPartWithFileData:UIImageJPEGRepresentation(image, 0.75) name:@"fileupload" fileName:@"image.jpg" mimeType:@"image/jpeg"];
+    } configurationHandler:nil completionHandler:^(NSError *error, id result, BOOL isFromCache, AFHTTPRequestOperation *operation) {
+        if (!error) {
+            [self appendLog:@"图片上传成功，正在下载显示..."];
+            [imageView setImageWithURL:[NSURL URLWithString:result[@"links"][@"image_link"]]];
+        } else {
+            [self appendLog:error.description];
+        }
     }];
 }
 

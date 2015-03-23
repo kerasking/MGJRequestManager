@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		6A251D591AC00BE700FBF50B /* warren.jpg in Resources */ = {isa = PBXBuildFile; fileRef = 6A251D581AC00BE700FBF50B /* warren.jpg */; };
 		6A46D3A61AB9740A0091BA6D /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = 6A46D3A51AB9740A0091BA6D /* main.m */; };
 		6A46D3A91AB9740A0091BA6D /* AppDelegate.m in Sources */ = {isa = PBXBuildFile; fileRef = 6A46D3A81AB9740A0091BA6D /* AppDelegate.m */; };
 		6A46D3B41AB9740A0091BA6D /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 6A46D3B31AB9740A0091BA6D /* Images.xcassets */; };
@@ -30,6 +31,7 @@
 
 /* Begin PBXFileReference section */
 		237A18301D1ED97496C21867 /* Pods.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = Pods.release.xcconfig; path = "Pods/Target Support Files/Pods/Pods.release.xcconfig"; sourceTree = "<group>"; };
+		6A251D581AC00BE700FBF50B /* warren.jpg */ = {isa = PBXFileReference; lastKnownFileType = image.jpeg; path = warren.jpg; sourceTree = "<group>"; };
 		6A46D3A01AB9740A0091BA6D /* MGJRequestManagerDemo.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MGJRequestManagerDemo.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		6A46D3A41AB9740A0091BA6D /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		6A46D3A51AB9740A0091BA6D /* main.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = main.m; sourceTree = "<group>"; };
@@ -117,6 +119,7 @@
 		6A46D3A31AB9740A0091BA6D /* Supporting Files */ = {
 			isa = PBXGroup;
 			children = (
+				6A251D581AC00BE700FBF50B /* warren.jpg */,
 				6A46D3A41AB9740A0091BA6D /* Info.plist */,
 				6A46D3A51AB9740A0091BA6D /* main.m */,
 			);
@@ -241,6 +244,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				6A251D591AC00BE700FBF50B /* warren.jpg in Resources */,
 				6A46D3B71AB9740A0091BA6D /* LaunchScreen.xib in Resources */,
 				6A46D3B41AB9740A0091BA6D /* Images.xcassets in Resources */,
 			);
