@@ -37,9 +37,8 @@
 
 /**
  * 可以对返回的数据做一些预处理
- * 如果设置 shouldStopProcessing 为 YES，那么 completionBlock 将不会被触发
  */
-@property (nonatomic, copy) void (^responseHandler)(AFHTTPRequestOperation *operation, MGJResponse *response, BOOL *shouldStopProcessing);
+@property (nonatomic, copy) void (^responseHandler)(AFHTTPRequestOperation *operation, MGJResponse *response);
 
 /**
  *  发送数据之前可以做一些预处理，如果觉得可以取消此次发送，设置 *shouldStopProcessing 为 YES 即可

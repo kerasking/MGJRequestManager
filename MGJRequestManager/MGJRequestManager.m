@@ -369,19 +369,16 @@ static NSString * const MGJFileProcessingQueue = @"MGJFileProcessingQueue";
     };
     
     // 对拿到的 response 再做一层处理
-    BOOL (^handleResponse)(AFHTTPRequestOperation *, MGJResponse *, MGJRequestManagerConfiguration *) =  ^BOOL (AFHTTPRequestOperation *operation, MGJResponse *response, MGJRequestManagerConfiguration *configuration) {
-        BOOL shouldStopProcessing = NO;
-        
+    void (^handleResponse)(AFHTTPRequestOperation *, MGJResponse *, MGJRequestManagerConfiguration *) =  ^ void(AFHTTPRequestOperation *operation, MGJResponse *response, MGJRequestManagerConfiguration *configuration) {
         // 先调用默认的处理
         if (weakSelf.configuration.responseHandler) {
-            weakSelf.configuration.responseHandler(operation, response, &shouldStopProcessing);
+            weakSelf.configuration.responseHandler(operation, response);
         }
         
         // 如果客户端有定义过 responseHandler
         if (configuration.responseHandler) {
-            configuration.responseHandler(operation, response, &shouldStopProcessing);
+            configuration.responseHandler(operation, response);
         }
-        return shouldStopProcessing;
     };
     
     // 对 request 再做一层处理
@@ -393,7 +390,7 @@ static NSString * const MGJFileProcessingQueue = @"MGJFileProcessingQueue";
             weakSelf.configuration.requestHandler(operation, userInfo, &shouldStopProcessing);
         }
         
-        // 如果客户端有定义过 responseHandler
+        // 如果客户端有定义过 requestHandler
         if (configuration.requestHandler) {
             configuration.requestHandler(operation, userInfo, &shouldStopProcessing);
         }
@@ -405,11 +402,7 @@ static NSString * const MGJFileProcessingQueue = @"MGJFileProcessingQueue";
         MGJResponse *response = [[MGJResponse alloc] init];
         response.error = error;
         response.result = nil;
-        BOOL shouldStopProcessing = handleResponse(theOperation, response, configuration);
-        if (shouldStopProcessing) {
-            [weakSelf.completionBlocks removeObjectForKey:theOperation];
-            return ;
-        }
+        handleResponse(theOperation, response, configuration);
         
         completionHandler(response.error, response.result, NO, theOperation);
         [weakSelf.completionBlocks removeObjectForKey:theOperation];
@@ -422,11 +415,7 @@ static NSString * const MGJFileProcessingQueue = @"MGJFileProcessingQueue";
         MGJResponse *response = [[MGJResponse alloc] init];
         response.error = nil;
         response.result = responseObject;
-        BOOL shouldStopProcessing = handleResponse(theOperation, response, configuration);
-        if (shouldStopProcessing) {
-            [weakSelf.completionBlocks removeObjectForKey:theOperation];
-            return ;
-        }
+        handleResponse(theOperation, response, configuration);
         
         // 如果使用缓存，就把结果放到缓存中方便下次使用
         if (configuration.resultCacheDuration > 0 && [method isEqualToString:@"GET"] && !response.error) {
