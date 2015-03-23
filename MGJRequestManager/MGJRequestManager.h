@@ -62,7 +62,7 @@ typedef void (^MGJRequestManagerConfigurationHandler)(MGJRequestManagerConfigura
 
 typedef void (^MGJRequestManagerCompletionHandler)(NSError *error, id result, BOOL isFromCache, AFHTTPRequestOperation *operation);
 
-typedef void (^MGJRequestManagerParametersHandler)(NSDictionary *requestParameters, NSDictionary *builtinParameters);
+typedef void (^MGJRequestManagerParametersHandler)(NSMutableDictionary *requestParameters, NSMutableDictionary *builtinParameters);
 
 @interface MGJRequestManager : NSObject
 

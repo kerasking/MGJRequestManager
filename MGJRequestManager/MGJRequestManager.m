@@ -297,7 +297,11 @@ static NSString * const MGJFileProcessingQueue = @"MGJFileProcessingQueue";
     self.requestManager.responseSerializer = configuration.responseSerializer;
     
     if (self.parametersHandler) {
-        self.parametersHandler(parameters, configuration.builtinParameters);
+        NSMutableDictionary *mutableParameters = [NSMutableDictionary dictionaryWithDictionary:parameters];
+        NSMutableDictionary *mutableBultinParameters = [NSMutableDictionary dictionaryWithDictionary:configuration.builtinParameters];
+        self.parametersHandler(mutableParameters, mutableBultinParameters);
+        parameters = [mutableParameters copy];
+        configuration.builtinParameters = [mutableBultinParameters copy];
     }
     
     NSString *combinedURL = [URLString stringByAppendingString:[self serializeParams:configuration.builtinParameters]];

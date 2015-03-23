@@ -9,6 +9,7 @@
 #import "DemoDetailViewController.h"
 #import "DemoListViewController.h"
 #import "MGJRequestManager.h"
+#import <CommonCrypto/CommonDigest.h>
 
 @interface DemoDetailViewController ()
 @property (nonatomic) UITextView *resultTextView;
@@ -34,6 +35,11 @@
         detailViewController.selectedSelector = @selector(makeBuiltinParametersRequest);
         return detailViewController;
     }];
+    
+    [DemoListViewController registerWithTitle:@"每次请求都根据参数计算 Token" handler:^UIViewController *{
+        detailViewController.selectedSelector = @selector(calculateTokenEveryRequest);
+        return detailViewController;
+    }];
 }
 
 - (void)viewDidLoad {
@@ -54,6 +60,8 @@
 - (void)viewDidAppear:(BOOL)animated
 {
     [super viewDidAppear:animated];
+    [MGJRequestManager sharedInstance].configuration = nil;
+    [self appendLog:@"准备中..."];
     [self.resultTextView addObserver:self forKeyPath:@"contentSize" options:NSKeyValueObservingOptionNew context:nil];
     [self performSelector:self.selectedSelector withObject:nil afterDelay:0];
 }
@@ -92,9 +100,22 @@
     }
 }
 
+- (NSString *)md5String:(NSString *)string
+{
+    const char *cStr = [string UTF8String];
+    unsigned char result[CC_MD5_DIGEST_LENGTH];
+    CC_MD5( cStr, (uint)strlen(cStr), result ); // This is the md5 call
+    return [NSString stringWithFormat:
+            @"%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x",
+            result[0], result[1], result[2], result[3],
+            result[4], result[5], result[6], result[7],
+            result[8], result[9], result[10], result[11],
+            result[12], result[13], result[14], result[15]
+            ];
+}
+
 - (void)makeGETRequest
 {
-    [self appendLog:@"准备中..."];
     [[MGJRequestManager sharedInstance] GET:@"http://httpbin.org/get" parameters:@{@"foo": @"bar"} startImmediately:YES
  configurationHandler:nil completionHandler:^(NSError *error, id<NSObject> result, BOOL isFromCache, AFHTTPRequestOperation *operation) {
      [self appendLog:result.description];
@@ -103,7 +124,6 @@
 
 - (void)makeCacheGETRequest
 {
-    [self appendLog:@"准备中..."];
     AFHTTPRequestOperation *operation1 = [[MGJRequestManager sharedInstance]
                                           GET:@"http://httpbin.org/get"
                                           parameters:@{@"foo": @"bar"}
@@ -138,11 +158,8 @@
 
 - (void)makeBuiltinParametersRequest
 {
-    [self appendLog:@"准备中..."];
-    NSDictionary *builtinParameters = @{@"t": @([[NSDate date] timeIntervalSince1970]), @"network": @"1", @"device": @"iphone3,2"};
-    
     MGJRequestManagerConfiguration *configuration = [[MGJRequestManagerConfiguration alloc] init];
-    configuration.builtinParameters = builtinParameters;
+    configuration.builtinParameters = @{@"t": @([[NSDate date] timeIntervalSince1970]), @"network": @"1", @"device": @"iphone3,2"};
     [MGJRequestManager sharedInstance].configuration = configuration;
     
     [[MGJRequestManager sharedInstance] GET:@"http://httpbin.org/get"
@@ -154,6 +171,29 @@
                               } else {
                                   [self appendLog:[NSString stringWithFormat:@"请求结果: %@", result.description]];
                               }
+                          }];
+}
+
+- (void)calculateTokenEveryRequest
+{
+    MGJRequestManagerConfiguration *configuration = [[MGJRequestManagerConfiguration alloc] init];
+    configuration.builtinParameters = @{@"t": @([[NSDate date] timeIntervalSince1970]), @"network": @"1", @"device": @"iphone3,2"};
+    [MGJRequestManager sharedInstance].configuration = configuration;
+    
+    [MGJRequestManager sharedInstance].parametersHandler = ^(NSMutableDictionary *builtinParameters, NSMutableDictionary *requestParameters) {
+        NSString *builtinValues = [builtinParameters.allValues componentsJoinedByString:@""];
+        NSString *requestValues = [requestParameters.allValues componentsJoinedByString:@""];
+        NSString *md5Values = [self md5String:[NSString stringWithFormat:@"%@%@", builtinValues, requestValues]];
+        requestParameters[@"token"] = md5Values;
+    };
+    
+    NSDictionary *requestParameters = @{@"user_id": @1024};
+    [[MGJRequestManager sharedInstance] GET:@"http://httpbin.org/get"
+                                 parameters:requestParameters
+                           startImmediately:YES
+                       configurationHandler:nil
+                          completionHandler:^(NSError *error, id<NSObject> result, BOOL isFromCache, AFHTTPRequestOperation *operation) {
+                              [self appendLog:result.description];
                           }];
 }
 
