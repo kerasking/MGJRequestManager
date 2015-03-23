@@ -9,6 +9,7 @@
 #import "DemoListViewController.h"
 
 static NSMutableDictionary *titleWithHandlers;
+static NSMutableArray *titles;
 
 @interface DemoListViewController () <UITableViewDataSource, UITableViewDelegate>
 @property (nonatomic) UITableView *tableView;
@@ -20,7 +21,9 @@ static NSMutableDictionary *titleWithHandlers;
 {
     if (!titleWithHandlers) {
         titleWithHandlers = [[NSMutableDictionary alloc] init];
+        titles = [NSMutableArray array];
     }
+    [titles addObject:title];
     titleWithHandlers[title] = handler;
 }
 
@@ -50,7 +53,8 @@ static NSMutableDictionary *titleWithHandlers;
 {
     UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:@"cell"];
     cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
-    cell.textLabel.text = titleWithHandlers.allKeys[indexPath.row];
+    
+    cell.textLabel.text = titles[indexPath.row];
     return cell;
 }
 
