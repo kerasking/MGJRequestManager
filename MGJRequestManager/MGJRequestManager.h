@@ -11,10 +11,15 @@
 
 extern NSInteger const MGJResponseCancelError;
 
+/**
+ *  将 error 和 result 统一在一个 object 中存放，处理起来会比较方便
+ */
 @interface MGJResponse : NSObject
 @property (nonatomic) NSError *error;
 @property (nonatomic) id result;
 @end
+
+
 
 @interface MGJRequestManagerConfiguration : NSObject <NSCopying>
 /**

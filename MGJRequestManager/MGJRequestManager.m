@@ -13,6 +13,13 @@ static NSString * const MGJFileProcessingQueue = @"MGJFileProcessingQueue";
 
 NSInteger const MGJResponseCancelError = -1;
 
+@implementation MGJResponse @end
+
+
+
+
+#pragma mark - MGJResponseCache
+
 @interface MGJResponseCache : NSObject
 
 - (void)setObject:(id <NSCoding>)object forKey:(NSString *)key;
@@ -162,7 +169,10 @@ NSInteger const MGJResponseCancelError = -1;
 
 @end
 
-@implementation MGJResponse @end
+
+
+
+#pragma mark - MGJRequestManagerConfiguration
 
 @implementation MGJRequestManagerConfiguration
 
@@ -179,21 +189,30 @@ NSInteger const MGJResponseCancelError = -1;
 - (instancetype)copyWithZone:(NSZone *)zone
 {
     MGJRequestManagerConfiguration *configuration = [[MGJRequestManagerConfiguration alloc] init];
-    configuration.requestSerializer = self.requestSerializer;
-    configuration.responseSerializer = self.responseSerializer;
-    configuration.baseURL = self.baseURL;
+    configuration.baseURL = [self.baseURL copy];
     configuration.resultCacheDuration = self.resultCacheDuration;
     configuration.builtinParameters = [self.builtinParameters copy];
-    configuration.userInfo = self.userInfo;
+    configuration.userInfo = [self.userInfo copy];
     return configuration;
 }
 
 @end
 
+
+
+
+#pragma mark - MGJRequestManager
+
 @interface MGJRequestManager ()
 @property (nonatomic) AFHTTPRequestOperationManager *requestManager;
 @property (nonatomic) NSMutableDictionary *chainedOperations;
+/**
+ *  避免引用 Operation 和 Block
+ */
 @property (nonatomic) NSMapTable *completionBlocks;
+/**
+ *  避免引用 Operation
+ */
 @property (nonatomic) NSMapTable *operationMethodParameters;
 @property (nonatomic) MGJResponseCache *cache;
 @property (nonatomic) NSMutableArray *batchGroups;
@@ -235,6 +254,8 @@ NSInteger const MGJResponseCancelError = -1;
 {
     self.networkStatus = [notification.userInfo[AFNetworkingReachabilityNotificationStatusItem] integerValue];
 }
+
+#pragma mark - Public
 
 - (AFHTTPRequestOperation *)GET:(NSString *)URLString
                      parameters:(NSDictionary *)parameters
@@ -298,6 +319,8 @@ NSInteger const MGJResponseCancelError = -1;
     self.requestManager.requestSerializer = configuration.requestSerializer;
     self.requestManager.responseSerializer = configuration.responseSerializer;
     
+    // 如果定义过 parametersHandler，可以对 builtin parameters 和 request parameters 进行调整
+    // 比如需要根据这两个值计算 token
     if (self.parametersHandler) {
         NSMutableDictionary *mutableParameters = [NSMutableDictionary dictionaryWithDictionary:parameters];
         NSMutableDictionary *mutableBultinParameters = [NSMutableDictionary dictionaryWithDictionary:configuration.builtinParameters];
@@ -310,13 +333,16 @@ NSInteger const MGJResponseCancelError = -1;
     NSMutableURLRequest *request;
     
     if (block) {
+        // 如果是上传的情况，特殊处理，把 block 塞进去
         request = [self.requestManager.requestSerializer multipartFormRequestWithMethod:@"POST" URLString:[[NSURL URLWithString:combinedURL relativeToURL:[NSURL URLWithString:configuration.baseURL]] absoluteString] parameters:parameters constructingBodyWithBlock:block error:nil];
     } else {
         request = [self.requestManager.requestSerializer requestWithMethod:method URLString:[[NSURL URLWithString:combinedURL relativeToURL:[NSURL URLWithString:configuration.baseURL]] absoluteString] parameters:parameters error:nil];
     }
     
+    // 根据 configuration 和 request 生成一个 operation
     AFHTTPRequestOperation *operation = [self createOperationWithConfiguration:configuration request:request];
     
+    // 如果不是马上执行的话，先把参数记录下来，方便之后回放
     if (!startImmediately) {
         NSMutableDictionary *methodParameters = [NSMutableDictionary dictionaryWithDictionary:@{
                                            @"method": method,
@@ -351,44 +377,28 @@ NSInteger const MGJResponseCancelError = -1;
     __weak typeof(self) weakSelf = self;
     
     void (^checkIfShouldDoChainOperation)(AFHTTPRequestOperation *) = ^(AFHTTPRequestOperation *operation){
+        __strong typeof(self) strongSelf = weakSelf;
         // TODO 不用每次都去找一下 ChainedOperations
-        AFHTTPRequestOperation *nextOperation = [weakSelf findNextOperationInChainedOperationsBy:operation];
+        AFHTTPRequestOperation *nextOperation = [strongSelf findNextOperationInChainedOperationsBy:operation];
         if (nextOperation) {
-            NSDictionary *methodParameters = [weakSelf.operationMethodParameters objectForKey:nextOperation];
+            NSDictionary *methodParameters = [strongSelf.operationMethodParameters objectForKey:nextOperation];
             if (methodParameters) {
-                [weakSelf HTTPRequestOperationWithMethod:methodParameters[@"method"]
+                [strongSelf HTTPRequestOperationWithMethod:methodParameters[@"method"]
                                                URLString:methodParameters[@"URLString"]
                                               parameters:methodParameters[@"parameters"]
                                         startImmediately:YES
                                constructingBodyWithBlock:methodParameters[@"constructingBodyWithBlock"]
                                     configurationHandler:methodParameters[@"configurationHandler"]
                                        completionHandler:methodParameters[@"completionHandler"]];
-                [weakSelf.operationMethodParameters removeObjectForKey:nextOperation];
+                [strongSelf.operationMethodParameters removeObjectForKey:nextOperation];
             } else {
-                [weakSelf.requestManager.operationQueue addOperation:nextOperation];
+                [strongSelf.requestManager.operationQueue addOperation:nextOperation];
             }
         }
     };
     
-    // 对拿到的 response 再做一层处理
-    BOOL (^handleResponse)(AFHTTPRequestOperation *, MGJResponse *, MGJRequestManagerConfiguration *) =  ^ BOOL(AFHTTPRequestOperation *operation, MGJResponse *response, MGJRequestManagerConfiguration *configuration) {
-        
-        BOOL shouldStopProcessing = NO;
-        
-        // 先调用默认的处理
-        if (weakSelf.configuration.responseHandler) {
-            weakSelf.configuration.responseHandler(operation, configuration.userInfo, response, &shouldStopProcessing);
-        }
-        
-        // 如果客户端有定义过 responseHandler
-        if (configuration.responseHandler) {
-            configuration.responseHandler(operation, configuration.userInfo, response, &shouldStopProcessing);
-        }
-        return shouldStopProcessing;
-    };
-    
-    // 对 request 再做一层处理
-    BOOL (^handleRequest)(AFHTTPRequestOperation *, id userInfo, MGJRequestManagerConfiguration *) =  ^BOOL (AFHTTPRequestOperation *operation, id userInfo, MGJRequestManagerConfiguration *configuration) {
+    // 对 request 做一层处理
+    BOOL (^shouldStopProcessingRequest)(AFHTTPRequestOperation *, id userInfo, MGJRequestManagerConfiguration *) =  ^BOOL (AFHTTPRequestOperation *operation, id userInfo, MGJRequestManagerConfiguration *configuration) {
         BOOL shouldStopProcessing = NO;
         
         // 先调用默认的处理
@@ -403,57 +413,57 @@ NSInteger const MGJResponseCancelError = -1;
         return shouldStopProcessing;
     };
     
-    void (^handleFailure)(AFHTTPRequestOperation *, NSError *) = ^(AFHTTPRequestOperation *theOperation, NSError *error) {
-        
+    // 对 response 做一层处理
+    MGJResponse *(^handleResponse)(AFHTTPRequestOperation *, id) = ^ MGJResponse *(AFHTTPRequestOperation *theOperation, id responseObject) {
         MGJResponse *response = [[MGJResponse alloc] init];
-        response.error = error;
-        response.result = nil;
-        BOOL shouldStopProcessing = handleResponse(theOperation, response, configuration);
+        // a bit trick :)
+        response.error = [responseObject isKindOfClass:[NSError class]] ? responseObject : nil;
+        response.result = response.error ? nil : responseObject;
         
+        BOOL shouldStopProcessing = NO;
+        
+        // 先调用默认的处理
+        if (weakSelf.configuration.responseHandler) {
+            weakSelf.configuration.responseHandler(operation, configuration.userInfo, response, &shouldStopProcessing);
+        }
+        
+        // 如果客户端有定义过 responseHandler
+        if (configuration.responseHandler) {
+            configuration.responseHandler(operation, configuration.userInfo, response, &shouldStopProcessing);
+        }
+        
+        // shouldStopProcessing 的话, completionHandler 是不会被触发的
         if (shouldStopProcessing) {
             [weakSelf.completionBlocks removeObjectForKey:theOperation];
-            return ;
+            return response;
         }
         
         completionHandler(response.error, response.result, NO, theOperation);
         [weakSelf.completionBlocks removeObjectForKey:theOperation];
         
         checkIfShouldDoChainOperation(theOperation);
+        return response;
     };
     
+    
     [operation setCompletionBlockWithSuccess:^(AFHTTPRequestOperation *theOperation, id responseObject){
-        
-        MGJResponse *response = [[MGJResponse alloc] init];
-        response.error = nil;
-        response.result = responseObject;
-        
-        BOOL shouldStopProcessing = handleResponse(theOperation, response, configuration);
-        
-        if (shouldStopProcessing) {
-            [weakSelf.completionBlocks removeObjectForKey:theOperation];
-            return ;
-        }
+        MGJResponse *response = handleResponse(theOperation, responseObject);
         
         // 如果使用缓存，就把结果放到缓存中方便下次使用
         if (configuration.resultCacheDuration > 0 && [method isEqualToString:@"GET"] && !response.error) {
-            // 不使用 builtinParameters
+            // 不使用 builtinParameters, 因为 builtin parameters 可能有时间这样的变量
             NSString *urlKey = [URLString stringByAppendingString:[self serializeParams:parameters]];
             [weakSelf.cache setObject:response.result forKey:urlKey];
         }
-        completionHandler(response.error, response.result, NO, theOperation);
-        // 及时移除，避免循环引用
-        [weakSelf.completionBlocks removeObjectForKey:theOperation];
-        
-        checkIfShouldDoChainOperation(theOperation);
     } failure:^(AFHTTPRequestOperation *theOperation, NSError *error){
-        handleFailure(theOperation, error);
+        handleResponse(theOperation, error);
     }];
     
-    if (!handleRequest(operation, configuration.userInfo, configuration)) {
+    if (!shouldStopProcessingRequest(operation, configuration.userInfo, configuration)) {
         [self.requestManager.operationQueue addOperation:operation];
     } else {
         NSError *error = [NSError errorWithDomain:@"取消请求" code:MGJResponseCancelError userInfo:nil];
-        handleFailure(operation, error);
+        handleResponse(operation, error);
     }
     
     [self.completionBlocks setObject:operation.completionBlock forKey:operation];
@@ -516,7 +526,7 @@ NSInteger const MGJResponseCancelError = -1;
         self.chainedOperations[chainName] = [[NSMutableArray alloc] init];
     }
     
-    // 只加入第一个，其余的在第一个执行完后会依次执行
+    // 只启动第一个，其余的在第一个执行完后会依次执行
     if (!((NSMutableArray *)self.chainedOperations[chainName]).count) {
         operation = [self startOperation:operation];
     }
@@ -541,10 +551,8 @@ NSInteger const MGJResponseCancelError = -1;
 - (void)removeOperationsInChain:(NSString *)chain
 {
     NSString *chainName = chain ? : @"";
-    if (self.chainedOperations[chainName]) {
-        NSMutableArray *chainedOperations = self.chainedOperations[chainName];
-        [chainedOperations removeAllObjects];
-    }
+    NSMutableArray *chainedOperations = self.chainedOperations[chainName];
+    chainedOperations ? [chainedOperations removeAllObjects] : @"do nothing";
 }
 
 - (void)batchOfRequestOperations:(NSArray *)operations
