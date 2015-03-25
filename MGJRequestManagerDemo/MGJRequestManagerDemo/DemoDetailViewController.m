@@ -475,11 +475,14 @@
     };
     
     [MGJRequestManager sharedInstance].configuration = configuration;
-    [[MGJRequestManager sharedInstance] GET:@"http://httpbin.org/delay/2" parameters:nil startImmediately:YES configurationHandler:^(MGJRequestManagerConfiguration *configuration){
-        configuration.userInfo = @{@"showLoading": @YES};
-    } completionHandler:^(NSError *error, id<NSObject> result, BOOL isFromCache, AFHTTPRequestOperation *operation) {
-        [self appendLog:result.description];
-    }];
+    [[MGJRequestManager sharedInstance] GET:@"http://httpbin.org/delay/2"
+                                 parameters:nil
+                           startImmediately:YES
+                       configurationHandler:^(MGJRequestManagerConfiguration *configuration){
+                           configuration.userInfo = @{@"showLoading": @YES};
+                       } completionHandler:^(NSError *error, id<NSObject> result, BOOL isFromCache, AFHTTPRequestOperation *operation) {
+                           [self appendLog:result.description];
+                       }];
 }
 
 - (void)calculateRequestTime
