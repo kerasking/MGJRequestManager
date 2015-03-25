@@ -1,7 +1,7 @@
 ## MGJRequestManager 是什么
 MGJRequestManager 是一款基于 AFNetwokring 2.0+ 的 iOS 网络库。
 
-一般在做项目时，我们都会在 AFNetworking 的基础上再封装一层，加入一些业务逻辑，然后作为统一的 API 层。细分下来的话，功能点其实不多，且相对固定和通用，于是就索性把这些常用的功能统一处理，并提供灵活的使用方式，于是就有了 MGJRequestManager。
+一般在做项目时，我们都会在 AFNetworking 的基础上再封装一层，加入一些业务逻辑，然后作为统一的 API 层。细分下来的话，功能点其实不多，且相对固定和通用，就索性把这些常用的功能统一处理，并提供灵活的使用方式，于是就有了 MGJRequestManager。
 
 ## MGJRequestManager 的优势
 ### [Eat your own dog food](http://en.wikipedia.org/wiki/Eating_your_own_dog_food)
