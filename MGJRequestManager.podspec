@@ -44,7 +44,7 @@ Pod::Spec.new do |s|
   #  profile URL.
   #
 
-  s.author             = { "limboy" => "limboy.me@gmail.com" }
+  s.author             = { "lzyy" => "healdream@gmail.com" }
 
   # ――― Platform Specifics ――――――――――――――――――――――――――――――――――――――――――――――――――――――― #
   #
