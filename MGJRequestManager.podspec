@@ -66,7 +66,7 @@ Pod::Spec.new do |s|
   #  Supports git, hg, bzr, svn and HTTP.
   #
 
-  s.source       = { :git => "http://github.com/mogujie/MGJRequestManager.git", :tag => "0.8.0" }
+  s.source       = { :git => "https://github.com/mogujie/MGJRequestManager.git", :tag => "0.8.0" }
 
 
   # ――― Source Code ―――――――――――――――――――――――――――――――――――――――――――――――――――――――――――――― #
