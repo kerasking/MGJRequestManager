@@ -32,6 +32,12 @@ MGJRequestManager 目前被用在「[蘑菇街](http://www.mogujie.com)」，「
 
 That's It!
 
+## 安装
+
+```
+pod 'MGJRequestManager'
+```
+
 ## 演示
 ![](http://ww3.sinaimg.cn/large/afe37136gw1eqi6vj4g6bg207g0dctl6.gif)
 
