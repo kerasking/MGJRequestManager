@@ -43,7 +43,7 @@ pod 'MGJRequestManager'
 
 ## 使用
 
-以「发送请求时显示 loading，发送完成后隐藏 loadin」为例
+以「发送请求时显示 loading，发送完成后隐藏 loading」为例
 
 ```objc
 // 1
